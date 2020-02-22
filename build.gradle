@@ -1,0 +1,58 @@
+// 所有子项目的通用配置
+subprojects {
+	group 'com.doopp.gauss'
+	version '1.0'
+
+	apply plugin: 'java'
+	apply plugin: 'application'
+
+    // JVM 版本号要求
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
+
+    // java编译的时候缺省状态下会因为中文字符而失败
+    [compileJava,compileTestJava,javadoc]*.options*.encoding = 'UTF-8'
+
+	ext {
+	    springVersion = '5.2.1.RELEASE'
+	    undertowVersion = '2.0.28.Final'
+	}
+
+	repositories {
+	    // mavenLocal()
+	    // jcenter()
+	    // mavenCentral()
+	    maven{ url 'http://maven.aliyun.com/nexus/content/groups/public/'}
+	    maven { url 'https://jitpack.io' }
+	}
+
+	dependencies {
+
+	    // spring core
+	    compile "org.springframework:spring-core:$springVersion"
+	    compile "org.springframework:spring-aop:$springVersion"
+	    compile "org.springframework:spring-context:$springVersion"
+	    compile "org.springframework:spring-context-support:$springVersion"
+	    compile "org.springframework:spring-beans:$springVersion"
+	    compile "org.springframework:spring-web:$springVersion"
+	    compile "org.springframework:spring-webmvc:$springVersion"
+	    compile "org.springframework:spring-expression:$springVersion"
+	    compile "org.springframework:spring-tx:$springVersion"
+	    compile "org.springframework:spring-jdbc:$springVersion"
+	    compile "org.springframework:spring-test:$springVersion"
+
+	    // JSON
+	    compile 'com.google.code.gson:gson:2.8.2'
+
+	    // undertow
+	    compile "io.undertow:undertow-core:$undertowVersion"
+	    compile "io.undertow:undertow-servlet:$undertowVersion"
+	    // compile "io.undertow:undertow-websockets-jsr:$undertowVersion"
+
+	    testCompile group: 'junit', name: 'junit', version: '4.12'
+	}
+
+	tasks.withType(JavaCompile) {
+	    options.encoding = "UTF-8"
+	}
+}

@@ -1,0 +1,27 @@
+
+dependencies {
+    compile project(':core')
+}
+
+task clear(type:Delete){
+    delete 'build','target'
+}
+
+task release(type: Copy, dependsOn: [clear, jar]) {
+}
+
+jar {
+    manifest {
+        attributes(
+                "Manifest-Version": 1.0,
+                "Main-Class": "com.doopp.gauss.web_server.server.KTApplication",
+                "Class-Path": "./",
+                "Implementation-Title": "Gradle"
+        )
+    }
+    from {
+        configurations.compile.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+}

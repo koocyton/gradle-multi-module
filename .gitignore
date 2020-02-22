@@ -1,0 +1,28 @@
+# idea project files
+.idea/*
+.gradle
+*.iml
+build
+out
+gradlew
+gradlew.bat
+gradle
+
+# netbeans project files
+nbproject
+
+# zend studio for eclipse project files
+.buildpath
+.project
+.settings
+
+# windows thumbnail cache
+Thumbs.db
+
+# Mac cache
+dump.rdb
+
+# Mac DS_Store Files
+.DS_Store
+
+develop.properties
