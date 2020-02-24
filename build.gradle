@@ -41,18 +41,70 @@ subprojects {
 	    compile "org.springframework:spring-jdbc:$springVersion"
 	    compile "org.springframework:spring-test:$springVersion"
 
-	    // JSON
-	    compile 'com.google.code.gson:gson:2.8.2'
+		// JSON
+		compile 'com.google.code.gson:gson:2.8.2'
 
-	    // undertow
-	    compile "io.undertow:undertow-core:$undertowVersion"
-	    compile "io.undertow:undertow-servlet:$undertowVersion"
-	    // compile "io.undertow:undertow-websockets-jsr:$undertowVersion"
+		// undertow
+		compile "io.undertow:undertow-core:$undertowVersion"
+		compile "io.undertow:undertow-servlet:$undertowVersion"
+		// compile "io.undertow:undertow-websockets-jsr:$undertowVersion"
 
 	    testCompile group: 'junit', name: 'junit', version: '4.12'
 	}
 
 	tasks.withType(JavaCompile) {
 	    options.encoding = "UTF-8"
+	}
+
+	task clear(type:Delete){
+		delete 'build','target'
+	}
+
+	task release(type: Copy, dependsOn: [clear, jar]) {
+	}
+}
+
+project(':daemon') {
+	dependencies {
+
+		compile project(':core')
+	}
+
+	jar {
+		manifest {
+			attributes(
+					"Manifest-Version": 1.0,
+					"Main-Class": "com.doopp.gauss.daemon.KTApplication",
+					"Class-Path": "./",
+					"Implementation-Title": "Gradle"
+			)
+		}
+		from {
+			configurations.compile.collect {
+				it.isDirectory() ? it : zipTree(it)
+			}
+		}
+	}
+}
+project(':web-server') {
+
+	dependencies {
+		compile project(':core')
+	}
+
+	jar {
+		manifest {
+			attributes(
+					"Manifest-Version": 1.0,
+					"Main-Class": "com.doopp.gauss.web_server.server.KTApplication",
+					"Class-Path": "./",
+					"Implementation-Title": "Gradle"
+			)
+		}
+		from {
+			configurations.compile.collect {
+				it.isDirectory() ? it : zipTree(it)
+			}
+		}
 	}
 }
