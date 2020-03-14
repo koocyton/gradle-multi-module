@@ -37,17 +37,24 @@ public class UndertowServer implements InitializingBean, DisposableBean {
 
     private int port = 8088;
 
-    // private String sslPort;
-
-    // private Resource jksFile;
-
-    // private String jksPassword;
-
-    // private String jksSecret;
-
     private Undertow server;
 
     private DeploymentManager manager;
+
+    private Class<Filter>[] filterClasses;
+
+    public void setPropertiesGroupName(String groupName) {
+        ApplicationProperties applicationProperties = new ApplicationProperties();
+        this.host=applicationProperties.s(groupName + ".host");
+        this.port=applicationProperties.i(groupName + ".port");
+        this.webAppName=applicationProperties.s(groupName + ".webAppName");
+        this.webAppRoot=applicationProperties.r(groupName + ".webAppRoot");
+    }
+
+    @SafeVarargs
+    public final void setFilterClasses(Class<Filter>... filterClasses) {
+        this.filterClasses = filterClasses;
+    }
 
     @Override
     public void afterPropertiesSet() throws IOException, ServletException {
@@ -85,41 +92,20 @@ public class UndertowServer implements InitializingBean, DisposableBean {
         System.console().printf("Undertow web server on port " + port + " stopped");
     }
 
-    // private KeyManager[] getKeyManagers() {
-    //     try {
-    //         KeyStore keyStore = KeyStore.getInstance("JKS");
-    //         keyStore.load(jksFile.getInputStream(), this.jksPassword.toCharArray());
-    //         KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-    //         keyManagerFactory.init(keyStore, this.jksSecret.toCharArray());
-    //         return keyManagerFactory.getKeyManagers();
-    //     }
-    //     catch (Exception e) {
-    //         throw new RuntimeException(e);
-    //     }
-    // }
-
-    public void setApplicationProperties(ApplicationProperties properties) {
-        this.webAppName = properties.s("server.webAppName");
-        this.webAppRoot = properties.r("server.webAppRoot");
-        this.host = properties.s("server.host");
-        // this.port = properties.i("server.port");
-        // this.sslPort = properties.i("server.sslPort");
-        // this.jksFile = properties.r("server.jks.file");
-        // this.jksPassword = properties.s("server.jks.password");
-        // this.jksSecret = properties.s("server.jks.secret");
-    }
-
-    public void setPort(int port) {
-        this.port = port;
-    }
-
     private DeploymentInfo deploymentInfo () throws IOException {
-        // System.out.println(sslPort);
-        // web servlet
-        // InstanceFactory<? extends ServletContainerInitializer> instanceFactory = new ImmediateInstanceFactory<>(servletContainerInitializer);
-
+        // config
         Set<Class<?>> hashSet = new HashSet<>();
-        hashSet.add(ApplicationConfiguration.class);
+
+        // add filter
+        if (this.filterClasses!=null && this.filterClasses.length>1) {
+            for (Class<Filter> filterClass : this.filterClasses) {
+                if (Filter.class.isAssignableFrom(filterClass)) {
+                    hashSet.add(filterClass);
+                }
+            }
+        }
+
+        // create deploymentInfo
         ServletContainerInitializerInfo sciInfo = new ServletContainerInitializerInfo(WebAppServletContainerInitializer.class, hashSet);
         return Servlets.deployment()
                 .addServletContainerInitializers(sciInfo)
@@ -132,7 +118,7 @@ public class UndertowServer implements InitializingBean, DisposableBean {
     private static class WebAppServletContainerInitializer implements ServletContainerInitializer {
 
         @Override
-        public void onStartup(Set<Class<?>> c, ServletContext servletContext) throws ServletException {
+        public void onStartup(Set<Class<?>> classSet, ServletContext servletContext) throws ServletException {
 
             // set encode
             FilterRegistration.Dynamic encodingFilter = servletContext.addFilter("encoding-filter", CharacterEncodingFilter.class);
@@ -142,19 +128,22 @@ public class UndertowServer implements InitializingBean, DisposableBean {
 
             // root web application context
             AnnotationConfigWebApplicationContext rootWebAppContext = new AnnotationConfigWebApplicationContext();
-            rootWebAppContext.register(ApplicationConfiguration.class, MyWebMvcConfigurer.class);
+            rootWebAppContext.register(ApplicationConfiguration.class);
+            rootWebAppContext.register(MyWebMvcConfigurer.class);
             servletContext.addListener(new ContextLoaderListener(rootWebAppContext));
 
             // set spring mvc dispatcher
             DispatcherServlet dispatcherServlet = new DispatcherServlet(rootWebAppContext);
-            ServletRegistration.Dynamic dispatcher = servletContext.addServlet("mvc-dispatcher", dispatcherServlet);
+            ServletRegistration.Dynamic dispatcher = servletContext.addServlet("dispatcher-servlet", dispatcherServlet);
             dispatcher.setLoadOnStartup(1);
             dispatcher.addMapping("/");
 
             // session filter
-            c.forEach(aClass -> {
-                FilterRegistration.Dynamic apiFilter = servletContext.addFilter("apiFilter", aClass);
-                apiFilter.addMappingForUrlPatterns(EnumSet.allOf(DispatcherType.class), false, "/api/*");
+            classSet.forEach(aClass -> {
+                if (OncePerRequestFilter.class.isAssignableFrom(aClass)) {
+                    FilterRegistration.Dynamic apiFilter = servletContext.addFilter("apiFilter", (Class<Filter>) aClass);
+                    apiFilter.addMappingForUrlPatterns(EnumSet.allOf(DispatcherType.class), false, "/api/*");
+                }
             });
         }
     }

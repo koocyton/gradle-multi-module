@@ -15,14 +15,13 @@ public class KTApplication {
 
             // init applicationContext
             final AbstractApplicationContext ctx = new FileSystemXmlApplicationContext("classpath:config/spring-undertow.xml");
-            // final AbstractApplicationContext ctx = new AnnotationConfigApplicationContext(SpringUndertow.class);
 
             // add a shutdown hook for the above context...
             ctx.registerShutdownHook();
         }
         // 缺少配置文件
         else {
-            System.out.print("\n Run Example : java -jar application.war propertiesConfigPath\n");
+            System.out.print("\n Run Example : java -jar application.jar propertiesConfigPath\n");
         }
     }
 }
