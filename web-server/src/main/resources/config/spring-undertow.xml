@@ -3,10 +3,7 @@
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd">
 
-    <bean id="undertowServer" class="com.doopp.gauss.web_server.server.undertow.UndertowServer">
-        <property name="servletContainerInitializer">
-            <bean class="com.doopp.gauss.web_server.server.undertow.WebAppServletContainerInitializer" />
-        </property>
+    <bean id="undertowServer" class="com.doopp.gauss.core.server.UndertowServer">
         <property name="applicationProperties">
             <bean class="com.doopp.gauss.core.server.util.ApplicationProperties" />
         </property>

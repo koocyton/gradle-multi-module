@@ -1,22 +1,29 @@
-package com.doopp.gauss.web_server.server.undertow;
+package com.doopp.gauss.core.server;
 
+import com.doopp.gauss.core.server.configuration.ApplicationConfiguration;
+import com.doopp.gauss.core.server.configuration.MyWebMvcConfigurer;
 import com.doopp.gauss.core.server.util.ApplicationProperties;
 import io.undertow.Undertow;
-import io.undertow.UndertowOptions;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.handlers.resource.FileResourceManager;
 import io.undertow.servlet.Servlets;
 import io.undertow.servlet.api.DeploymentInfo;
 import io.undertow.servlet.api.DeploymentManager;
-import io.undertow.servlet.api.InstanceFactory;
 import io.undertow.servlet.api.ServletContainerInitializerInfo;
-import io.undertow.servlet.util.ImmediateInstanceFactory;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.core.io.Resource;
+import org.springframework.web.context.ContextLoaderListener;
+import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
+import org.springframework.web.filter.CharacterEncodingFilter;
+import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.servlet.DispatcherServlet;
 
-import javax.servlet.ServletContainerInitializer;
+import javax.servlet.*;
+import java.io.IOException;
+import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.Set;
 
 import static io.undertow.Handlers.path;
 
@@ -38,28 +45,14 @@ public class UndertowServer implements InitializingBean, DisposableBean {
 
     // private String jksSecret;
 
-    private ServletContainerInitializer servletContainerInitializer;
-
     private Undertow server;
 
     private DeploymentManager manager;
 
     @Override
-    public void afterPropertiesSet() throws Exception {
-        // System.out.println(sslPort);
-        // web servlet
-        InstanceFactory<? extends ServletContainerInitializer> instanceFactory = new ImmediateInstanceFactory<>(servletContainerInitializer);
-        ServletContainerInitializerInfo sciInfo = new ServletContainerInitializerInfo(WebAppServletContainerInitializer.class, instanceFactory, new HashSet<>());
-        DeploymentInfo deploymentInfo = Servlets.deployment()
-                // .addServletContainerInitalizer(sciInfo)
-                .addServletContainerInitializers(sciInfo)
-                // .addServlet(Servlets.servlet("default", DefaultServlet.class))
-                .setResourceManager(new FileResourceManager(webAppRoot.getFile(), 0))
-                .setClassLoader(UndertowServer.class.getClassLoader())
-                .setContextPath("")
-                .setDeploymentName(webAppName);
+    public void afterPropertiesSet() throws IOException, ServletException {
 
-        manager = Servlets.defaultContainer().addDeployment(deploymentInfo);
+        manager = Servlets.defaultContainer().addDeployment(this.deploymentInfo());
         manager.deploy();
 
         // MySocketConnectionCallback connectionCallback = ApplicationContextUtil.getBean(MySocketConnectionCallback.class);
@@ -71,7 +64,7 @@ public class UndertowServer implements InitializingBean, DisposableBean {
         //sslContext.init(getKeyManagers(), null, null);
 
         server = Undertow.builder()
-                .setServerOption(UndertowOptions.ENABLE_HTTP2, true)
+                // .setServerOption(UndertowOptions.ENABLE_HTTP2, true)
                 .addHttpListener(port, host)
                 // .addHttpsListener(sslPort, host, sslContext)
                 .setHandler(httpHandler)
@@ -105,10 +98,6 @@ public class UndertowServer implements InitializingBean, DisposableBean {
     //     }
     // }
 
-    public void setServletContainerInitializer(ServletContainerInitializer servletContainerInitializer) {
-        this.servletContainerInitializer = servletContainerInitializer;
-    }
-
     public void setApplicationProperties(ApplicationProperties properties) {
         this.webAppName = properties.s("server.webAppName");
         this.webAppRoot = properties.r("server.webAppRoot");
@@ -122,5 +111,51 @@ public class UndertowServer implements InitializingBean, DisposableBean {
 
     public void setPort(int port) {
         this.port = port;
+    }
+
+    private DeploymentInfo deploymentInfo () throws IOException {
+        // System.out.println(sslPort);
+        // web servlet
+        // InstanceFactory<? extends ServletContainerInitializer> instanceFactory = new ImmediateInstanceFactory<>(servletContainerInitializer);
+
+        Set<Class<?>> hashSet = new HashSet<>();
+        hashSet.add(ApplicationConfiguration.class);
+        ServletContainerInitializerInfo sciInfo = new ServletContainerInitializerInfo(WebAppServletContainerInitializer.class, hashSet);
+        return Servlets.deployment()
+                .addServletContainerInitializers(sciInfo)
+                .setResourceManager(new FileResourceManager(webAppRoot.getFile(), 0))
+                .setClassLoader(UndertowServer.class.getClassLoader())
+                .setContextPath("")
+                .setDeploymentName(webAppName);
+    }
+
+    private static class WebAppServletContainerInitializer implements ServletContainerInitializer {
+
+        @Override
+        public void onStartup(Set<Class<?>> c, ServletContext servletContext) throws ServletException {
+
+            // set encode
+            FilterRegistration.Dynamic encodingFilter = servletContext.addFilter("encoding-filter", CharacterEncodingFilter.class);
+            encodingFilter.setInitParameter("encoding", "UTF-8");
+            encodingFilter.setInitParameter("forceEncoding", "true");
+            encodingFilter.addMappingForUrlPatterns(EnumSet.allOf(DispatcherType.class), false, "/*");
+
+            // root web application context
+            AnnotationConfigWebApplicationContext rootWebAppContext = new AnnotationConfigWebApplicationContext();
+            rootWebAppContext.register(ApplicationConfiguration.class, MyWebMvcConfigurer.class);
+            servletContext.addListener(new ContextLoaderListener(rootWebAppContext));
+
+            // set spring mvc dispatcher
+            DispatcherServlet dispatcherServlet = new DispatcherServlet(rootWebAppContext);
+            ServletRegistration.Dynamic dispatcher = servletContext.addServlet("mvc-dispatcher", dispatcherServlet);
+            dispatcher.setLoadOnStartup(1);
+            dispatcher.addMapping("/");
+
+            // session filter
+            c.forEach(aClass -> {
+                FilterRegistration.Dynamic apiFilter = servletContext.addFilter("apiFilter", aClass);
+                apiFilter.addMappingForUrlPatterns(EnumSet.allOf(DispatcherType.class), false, "/api/*");
+            });
+        }
     }
 }
