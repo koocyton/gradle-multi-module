@@ -14,3 +14,5 @@ include 'core'
 include 'daemon'
 // web 服务
 include 'web-server'
+// php 服务
+include 'php-module'
